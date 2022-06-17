@@ -2,7 +2,7 @@
 
 Q1decode is supposed to allow decoding of disks written By the Q1 computer.
 
-´´´
+```
 CNT: 01783 ADDRESS MARK: 55424954   
 00    00    00    10  V
 CNT: 017D9 DATA    MARK: 55424945   
@@ -56,7 +56,7 @@ CNT: 01DC9 DATA    MARK: 55424945
 09    00    09    00    00    00    00    00    00    00    00    00    00    00    00    00    
 00    00    00    00    00    00    00    00    CB    10    01    FF    FF    FF    FF    FF    
 FD  V
-´´´
+```
 
 This is a partial decode of the first track. All records end with a 10h digit it seems. It also seems that the byte just before the end marker is a checksum. For the address field it seems like this is just a simple sum of the prior bytes.
 
