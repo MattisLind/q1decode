@@ -4,9 +4,9 @@
 
 #define FM 1
 #define Q1 4
-#define q1thresh1 27
-#define q1thresh2 40
-#define q1thresh3 55
+#define q1thresh1 33
+#define q1thresh2 47
+#define q1thresh3 62
 #define fmthresh 0
 #define mfmthresh1 0
 #define mfmthresh2 0
@@ -97,21 +97,21 @@ void process_bit (char bit) {
   static unsigned char outword;
   static int bitcnt; 
   static int sum;
+  static int lastclk;
   data_word = data_word << 1;
   data_word |= bit;
-  /*
+  
   printf("CNT: %05X PROCESS BIT: %08X\n", cnt, data_word);
-  if (data_word  == 0x249248AA) { // Mark
+  if (data_word  == 0x55552A54) { // Mark
     printf("\nCNT: %05X ADDRESS MARK: %08X ", cnt, data_word);
-    state = 1; lastbit = 0; mfmword = 0; bitcnt=0; sum=0;
+    state = 1; lastbit = 0; mfmword = 0; bitcnt=0; sum=0; lastclk=0;
     return;
   }
-  if (data_word == 0xA4552492) { // Mark
+  if (data_word == 0x55552A44) { // Mark
     printf("\nCNT: %05X DATA    MARK: %08X ", cnt, data_word);
-    state = 1; lastbit = 1; mfmword = 0; bitcnt=0; sum=0;
+    state = 1; lastbit = 0; mfmword = 0; bitcnt=0; sum=0; lastclk=0;
     return;
-    }*/
-  state = 1;
+    }
   printf ("state = %d bit = %d mfmword=%1d lastbit=%d outword = %02X \n", state, bit, mfmword & 0b11, lastbit, outword);
   if (state == 1) {
     // shift in one bit into mfm word
@@ -121,20 +121,23 @@ void process_bit (char bit) {
     mfmword = mfmword << 1;
     mfmword |= bit;
     printf ("mfmword=%d\n", mfmword & 0x03);
-    if ((lastbit == 1) && ((mfmword & 0x3)  == 0b00)) {
+    if ((lastclk == 1) && ((mfmword & 0x3)  == 0b00)) {
       outword = outword << 1;
       outword |= 0;
       lastbit = 0;
       state = 1;
-    } else if ((lastbit == 0) && ((mfmword & 0x03) == 0b10)) {
+      lastclk=0;
+    } else if (((mfmword & 0x03) == 0b10) && (lastclk==0)) {
       outword = outword << 1;
       outword |= 0;
       lastbit = 0;
       state = 1;
+      lastclk=1;
     }  else if ((mfmword & 0x03) == 0b01) {
       outword = outword << 1;
       outword |= 1;
       lastbit = 1;
+      lastclk=1;
       state = 1;
     } else {
       state= 0;
