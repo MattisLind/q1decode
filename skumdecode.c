@@ -4,15 +4,15 @@
 
 #define FM 1
 #define Q1 4
-#define q1thresh1 33
-#define q1thresh2 47
+#define q1thresh1 32
+#define q1thresh2 45.5
 #define q1thresh3 62
 #define fmthresh 0
 #define mfmthresh1 0
 #define mfmthresh2 0
 #define postcomp 0.5
 #define cwclock 2
-#define mfmshort 18.0
+#define mfmshort 14
 #define garbage 0x62
 int uencoding = Q1;
 int bitOffset;
@@ -100,42 +100,43 @@ void process_bit (char bit) {
   static int lastclk;
   data_word = data_word << 1;
   data_word |= bit;
-  
-  printf("CNT: %05X PROCESS BIT: %08X\n", cnt, data_word);
+  //printf ("state = %d bit = %d mfmword=%1d lastbit=%d lastclk=%d outword = %02X \n", state, bit, mfmword & 0b11, lastbit, lastclk, outword );  
+  //  printf("CNT: %05X PROCESS BIT: %08X\n", cnt, data_word);
   if (data_word  == 0x55552A54) { // Mark
-    printf("\nCNT: %05X ADDRESS MARK: %08X ", cnt, data_word);
+    printf("\nCNT: %05X ADDRESS MARK: %08X \n", cnt, data_word);
     state = 1; lastbit = 0; mfmword = 0; bitcnt=0; sum=0; lastclk=0;
     return;
   }
   if (data_word == 0x55552A44) { // Mark
-    printf("\nCNT: %05X DATA    MARK: %08X ", cnt, data_word);
+    printf("\nCNT: %05X DATA    MARK: %08X\n ", cnt, data_word);
     state = 1; lastbit = 0; mfmword = 0; bitcnt=0; sum=0; lastclk=0;
     return;
     }
-  printf ("state = %d bit = %d mfmword=%1d lastbit=%d outword = %02X \n", state, bit, mfmword & 0b11, lastbit, outword);
+
   if (state == 1) {
     // shift in one bit into mfm word
+    mfmword = mfmword << 1;    
     mfmword |= bit;
     state = 2;
   } else if (state == 2) {
     mfmword = mfmword << 1;
     mfmword |= bit;
-    printf ("mfmword=%d\n", mfmword & 0x03);
+    //printf ("lastclk=%d mfmword=%d\n", lastclk, mfmword & 0x03);
     if ((lastclk == 1) && ((mfmword & 0x3)  == 0b00)) {
-      outword = outword << 1;
-      outword |= 0;
+      outword = outword >> 1;
+      outword &= 0x7f;
       lastbit = 0;
       state = 1;
       lastclk=0;
     } else if (((mfmword & 0x03) == 0b10) && (lastclk==0)) {
-      outword = outword << 1;
-      outword |= 0;
+      outword = outword >> 1;
+      outword &= 0x7f;
       lastbit = 0;
       state = 1;
       lastclk=1;
     }  else if ((mfmword & 0x03) == 0b01) {
-      outword = outword << 1;
-      outword |= 1;
+      outword = outword >> 1;
+      outword |= 0x80;
       lastbit = 1;
       lastclk=1;
       state = 1;
@@ -144,8 +145,8 @@ void process_bit (char bit) {
       printf ("\nV %08X-\n",mfmword);
     }
     printf ("%d", lastbit);
-        bitcnt++;
-	/*if (bitcnt == 8) {
+    bitcnt++;
+    if (bitcnt == 8) {
       bitcnt = 0;
       printf (" "); 
       outword = outword & 0xff;
@@ -154,10 +155,9 @@ void process_bit (char bit) {
         printf ("%c", outword);
       } else {
         printf (" "); 
-	}
+      }
     }
-    mfmword = 0;
-	*/
+    //printf("\n");
   }
 }
 
@@ -193,11 +193,9 @@ process_sample(int sample)
     } else if (sample + adj <= q1thresh3) {
       /* Long */
       len = 4;
-    } else if (sample + adj <= garbage) {
-      len = 5;
     } else {
-      len = 6;
-    }
+      len = 5;
+    } 
     
   } else  {
     if (sample + adj <= mfmthresh1) {
@@ -212,6 +210,9 @@ process_sample(int sample)
     }
     
   }
+  //printf ("sample + adj = %f\n", sample+adj);
+  //printf ("adj=%f\n", adj);
+  //printf("Length=%d\n", len);
   adj = (sample - (len/2.0 * mfmshort * cwclock)) * postcomp;
   if (len == 6) { cnt++; return; }
   process_bit(1);
@@ -230,6 +231,7 @@ int main (int argc, char ** argv) {
     printf ("bitOffset=%d\n", bitOffset);
   }  
   while ((c = getchar()) != -1) {
+    //    printf("Processing sample 0x%02X %d\n", c&0x7f, c&0x7f);
     process_sample(c & 0x7f);
   }
   return 0;
