@@ -15,7 +15,7 @@
 #define mfmshort 18.0
 #define garbage 0x62
 int uencoding = Q1;
-int bitOffset;
+int recordSize;
 int cnt = 0;
 
 
@@ -97,18 +97,28 @@ void process_bit (char bit) {
   static unsigned char outword;
   static int bitcnt; 
   static int sum;
+  static unsigned int crc;
+  static int byteCnt;
+  static int currentRecordSize;
+  static unsigned char buffer[256];
   data_word = data_word << 1;
   data_word |= bit;
   
   //printf("CNT: %05X PROCESS BIT: %08X\n", cnt, data_word);
   if (data_word  == 0x55424954) { // Mark
-    printf("\nCNT: %05X ADDRESS MARK: %08X ", cnt, data_word);
+    //printf("\nCNT: %05X ADDRESS MARK: %08X ", cnt, data_word);
     state = 1; lastbit = 0; mfmword = 0; bitcnt=0; sum=0;
+    crc = 0;
+    byteCnt = 0;
+    currentRecordSize = 2;
     return;
   }
   if (data_word == 0x55424945) { // Mark
-    printf("\nCNT: %05X DATA    MARK: %08X ", cnt, data_word);
+    //printf("\nCNT: %05X DATA    MARK: %08X ", cnt, data_word);
     state = 1; lastbit = 1; mfmword = 0; bitcnt=0; sum=0;
+    crc = 0x9B;
+    byteCnt = 0;
+    currentRecordSize = recordSize;
     return;
   }
   //printf ("state = %d bit = %d mfmword=%1X lastbit=%d outword = %02X \n", state, bit, mfmword & 0b11, lastbit, outword);
@@ -137,7 +147,7 @@ void process_bit (char bit) {
       state = 1;
     } else {
       state= 0;
-      printf ("V");
+      //printf ("V");
     }
     //printf ("%d", lastbit);
     //if (bitcnt == bitOffset) { 
@@ -146,14 +156,32 @@ void process_bit (char bit) {
     bitcnt++;
     if (bitcnt == 8) {
       bitcnt = 0;
-      printf (" "); 
-      outword = outword & 0xff;
-      printf (" %02X ", outword);
-      if ( (outword >= 32) && (outword < 127)) {
-        printf ("%c", outword);
-      } else {
-        printf (" "); 
+      if (byteCnt == currentRecordSize) {
+	if ((outword & 0xff) == (crc & 0xff)) {
+	  printf("CRC OK\n");
+	} else {
+	  printf("CRC ERROR\n");
 	}
+      }
+      buffer[byteCnt] = outword & 0xff;
+      byteCnt++;
+      //printf (" "); 
+      outword = outword & 0xff;
+      crc += outword & 0xff;
+      if (byteCnt <= currentRecordSize) {
+	printf ("%02X", outword);
+      }
+      if (byteCnt==currentRecordSize) {
+	printf("\n");
+	for (int i=0; i<currentRecordSize;i++) {
+	  if ( (buffer[i] >= 32) && (buffer[i] < 127)) {
+	    printf ("%c", buffer[i]);
+	  } else {
+	    printf (" "); 
+	  }
+	}
+	printf("\n");
+      }
     }
     mfmword = 0;
     
@@ -224,9 +252,12 @@ int main (int argc, char ** argv) {
   int c;
   if (argc==2) {
     printf ("ARG %s\n", argv[1]);
-    sscanf(argv[1], "%d", &bitOffset);
-    printf ("bitOffset=%d\n", bitOffset);
-  }  
+    sscanf(argv[1], "%d", &recordSize);
+    printf ("recordSize=%d\n", recordSize);
+  }  else {
+    printf("Need one argument. Please specify the record size for the track. Wrong record size will cause the CRC calculation to fail.\n");
+    return -1;
+  }
   while ((c = getchar()) != -1) {
     process_sample(c & 0x7f);
   }
