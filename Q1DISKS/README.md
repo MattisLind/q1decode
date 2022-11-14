@@ -1,4 +1,4 @@
-# FLuxsample files
+# Fluxsample files
 
 This directory contain flux sample files from some Q1 disks. 
 
